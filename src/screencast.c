@@ -342,6 +342,31 @@ on_screen_cast_dialog_done_cb (GtkWidget              *widget,
     request_unexport (dialog_handle->request);
 }
 
+static Monitor *
+find_monitor()
+{
+  DisplayStateTracker *display_state_tracker = display_state_tracker_get ();
+  GList *l;
+
+  for (l = display_state_tracker_get_logical_monitors (display_state_tracker);
+       l;
+       l = l->next)
+    {
+      LogicalMonitor *logical_monitor = l->data;
+      GList *monitors;
+
+      for (monitors = logical_monitor_get_monitors (logical_monitor);
+           monitors;
+           monitors = monitors->next)
+        {
+          Monitor *monitor = monitors->data;
+          return monitor;
+        }
+    }
+
+  return NULL;
+}
+
 static ScreenCastDialogHandle *
 create_screen_cast_dialog (ScreenCastSession     *session,
                            GDBusMethodInvocation *invocation,
@@ -399,7 +424,25 @@ create_screen_cast_dialog (ScreenCastSession     *session,
   if (external_parent)
     external_window_set_parent_of (external_parent, surface);
 
-  gtk_widget_show (dialog);
+  //
+
+  Monitor *monitor=find_monitor();
+
+  if(monitor) {
+      g_autoptr(GPtrArray) streams=g_ptr_array_new_with_free_func(g_free);
+      ScreenCastStreamInfo *info=g_new0(ScreenCastStreamInfo, 1);
+
+      info->type=SCREEN_CAST_SOURCE_TYPE_MONITOR;
+      info->data.monitor=monitor;
+      info->id=0;
+
+      g_ptr_array_add(streams, info);
+
+      on_screen_cast_dialog_done_cb(0, GTK_RESPONSE_OK, SCREEN_CAST_PERSIST_MODE_PERSISTENT, streams, dialog_handle);
+
+  } else {
+      gtk_widget_show (dialog);
+  }
 
   return dialog_handle;
 }
